@@ -2,25 +2,36 @@
 
 import { useState } from "react"
 import { PageHeader } from "@/components/ui/page-header"
-import { AgentsDataTable, DataTable, type Column } from "@/components/ui/data-table"
+import {  DataTable,   } from "@/components/ui/data-table"
+
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Users, UserCheck, UserX, Clock } from "lucide-react"
+import { Users, UserCheck, UserX, Clock, MoreHorizontal } from "lucide-react"
 import { StatCard } from "@/components/dashboard/startCard"
-import { Agent } from "node:http"
+import { mockAgents } from "@/constants/data"
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu"; // shadcn/ui
 
-interface Application {
-  id: string
-  phoneNumber: string
-  emailAddress: string
-  businessName: string
-  dateRegistered: string
-  category: "Agent" | "Driver"
+interface Agent {
+  id: string;
+  name: string;
+  agentId: string;
+  phoneNumber: string;
+  emailAddress: string;
+  dateJoined: string;
+  status: "Active" | "Inactive";
+  parcelsProcessed: number;
 }
+
+
 const statsData = [
   {
     title: "Total No. of Applications",
@@ -52,127 +63,104 @@ const statsData = [
   },
 ]
 
-const mockApplications: Application[] = [
-  {
-    id: "1",
-    phoneNumber: "08011022534",
-    emailAddress: "chinelomarcus@gmail.com",
-    businessName: "Chinelomarcus Logistics",
-    dateRegistered: "15-01-2025",
-    category: "Agent",
-  },
-  {
-    id: "2",
-    phoneNumber: "08011022534",
-    emailAddress: "chinelomarcus@gmail.com",
-    businessName: "",
-    dateRegistered: "15-01-2025",
-    category: "Driver",
-  },
-  {
-    id: "3",
-    phoneNumber: "08011022534",
-    emailAddress: "chinelomarcus@gmail.com",
-    businessName: "Chinelomarcus Logistics",
-    dateRegistered: "15-01-2025",
-    category: "Agent",
-  },
-  {
-    id: "4",
-    phoneNumber: "08011022534",
-    emailAddress: "chinelomarcus@gmail.com",
-    businessName: "",
-    dateRegistered: "15-01-2025",
-    category: "Driver",
-  },
-  {
-    id: "5",
-    phoneNumber: "08011022534",
-    emailAddress: "chinelomarcus@gmail.com",
-    businessName: "",
-    dateRegistered: "15-01-2025",
-    category: "Driver",
-  },
-  {
-    id: "6",
-    phoneNumber: "08011022534",
-    emailAddress: "chinelomarcus@gmail.com",
-    businessName: "Chinelomarcus Logistics",
-    dateRegistered: "15-01-2025",
-    category: "Agent",
-  },
-  {
-    id: "7",
-    phoneNumber: "08011022534",
-    emailAddress: "chinelomarcus@gmail.com",
-    businessName: "Chinelomarcus Logistics",
-    dateRegistered: "15-01-2025",
-    category: "Agent",
-  },
-  {
-    id: "8",
-    phoneNumber: "08011022534",
-    emailAddress: "chinelomarcus@gmail.com",
-    businessName: "",
-    dateRegistered: "15-01-2025",
-    category: "Driver",
-  },
-]
 
 export default function AgentsAndDriversPage() {
-  const [applications] = useState<Application[]>(mockApplications)
+  const [agent] = useState<Agent[]>(mockAgents)
   const [activeTab, setActiveTab] = useState("agents")
   const [searchTerm, setSearchTerm] = useState("")
   const [sortBy, setSortBy] = useState("all")
   const [showingCount, setShowingCount] = useState("10")
   const [dateFilter, setDateFilter] = useState("This Month")
-
-  const columns: Column<Application>[] = [
-    {
-      key: "phoneNumber",
-      label: "Phone Number",
-      sortable: true,
-    },
-    {
-      key: "emailAddress",
-      label: "Email Address",
-      sortable: true,
-    },
-    {
-      key: "businessName",
-      label: "Business Name",
-      sortable: true,
-      render: (value: string) => value || "-",
-    },
-    {
-      key: "dateRegistered",
-      label: "Date Registered",
-      sortable: true,
-    },
-    {
-      key: "category",
-      label: "Category",
-      sortable: true,
-      render: (value: string) => <StatusBadge status={value === "Agent" ? "success" : "info"}>{value}</StatusBadge>,
-    },
-    {
-      key: "actions",
-      label: "Action",
-      render: (_, row: Application) => (
-        <Button variant="outline" size="sm" className="text-blue-600 hover:text-blue-700 bg-transparent">
-          View
+type Column<T> =
+  | {
+      key: keyof T;
+      label: string;
+      sortable: true;
+      render?: (value: any, row: T) => React.ReactNode;
+    }
+  | {
+      key: string;
+      label: string;
+      sortable?: false;
+      render?: (value: any, row: T) => React.ReactNode;
+    };
+const columns: Column<Agent>[] = [
+  {
+    key: "name",
+    label: "Name",
+    sortable: true,
+  },
+  {
+    key: "agentId",
+    label: "Agent ID",
+    sortable: true,
+  },
+  {
+    key: "phoneNumber",
+    label: "Phone Number",
+    sortable: true,
+  },
+  {
+    key: "emailAddress",
+    label: "Email Address",
+    sortable: true,
+  },
+  {
+    key: "dateJoined",
+    label: "Date Joined",
+    sortable: true,
+  },
+  {
+    key: "status",
+    label: "Status",
+    sortable: true,
+    render: (value: string) => (
+      <StatusBadge
+        status={value === "Active" ? "success" : "error"}
+      >
+        {value}
+      </StatusBadge>
+    ),
+  },
+  {
+    key: "parcelsProcessed",
+    label: "Processed",
+    sortable: true,
+  },
+ {
+  key: "actions",
+  label: "Action",
+  render: (_: any, row: Agent) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+         <Button variant="ghost" size="sm">
+          <MoreHorizontal className="h-4 w-4" />
         </Button>
-      ),
-    },
-  ]
+      </DropdownMenuTrigger>
+      <DropdownMenuContent>
+        <DropdownMenuItem onClick={() => console.log("Viewing Agent:", row)}>
+          View
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => console.log("Modifying Agent:", row)}>
+          Modify
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  ),
+}
+];
 
-  // Filter applications based on search term
-  const filteredApplications = applications.filter(
-    (app) =>
-      app.phoneNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      app.emailAddress.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      app.businessName.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+// Filter agents based on search term (case-insensitive)
+const filteredAgents = mockAgents.filter((agent) => {
+  const search = searchTerm.toLowerCase();
+  return (
+    agent.name.toLowerCase().includes(search) ||
+    agent.agentId.toLowerCase().includes(search) ||
+    agent.phoneNumber.toLowerCase().includes(search) ||
+    agent.emailAddress.toLowerCase().includes(search) ||
+    agent.status.toLowerCase().includes(search)
+  );
+});
 
   return (
     <div className="space-y-6">
@@ -216,12 +204,13 @@ export default function AgentsAndDriversPage() {
     <TabsContent value="agents" className="space-y-4">
   {/* Applications Table */}
   <div className="bg-white rounded-lg border">
-    <AgentsDataTable
-      agents={filteredApplications}
+    <DataTable
+      data={filteredAgents}
       columns={columns}
-      searchPlaceholder="Search applications..."
-      showSearch={true}
-      className="border-0"
+      context={'agent'}
+      // searchPlaceholder="Search applications..."
+      // showSearch={true}
+      // className="border-0"
     />
   </div>
 </TabsContent>

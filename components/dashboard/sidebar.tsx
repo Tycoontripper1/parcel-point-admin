@@ -28,8 +28,9 @@ const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Agents and Drivers", href: "/dashboard/agents-drivers", icon: Users },
   { name: "Parcel Management", href: "/dashboard/parcels", icon: Package },
+    { name: "Dispute and Support", href: "/dashboard/dispute", icon: FileText },
   { name: "Payment Management", href: "/dashboard/payments", icon: CreditCard },
-  { name: "Reports and Support", href: "/dashboard/reports-support-1", icon: FileText },
+
   { name: "Reports and Support", href: "/dashboard/reports-support-2", icon: FileText },
   { name: "Reports and Support", href: "/dashboard/reports-support-3", icon: FileText },
   { name: "Tickets", href: "/dashboard/tickets", icon: Ticket },

@@ -6,25 +6,61 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ChevronLeft, ChevronRight, Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, Download } from "lucide-react"
-import { exportToCSV } from "@/lib/utils"
-import { statusOptions } from "@/constants/data"
+import { cn, exportToCSV } from "@/lib/utils"
+import { Agent, Dispute, statusOptions } from "@/constants/data"
 
-interface Agent {
+type Column<T> =
+  | {
+      key: keyof T;
+      label: string;
+      sortable: true;
+      render?: (value: any, row: T) => React.ReactNode;
+    }
+  | {
+      key: string;
+      label: string;
+      sortable?: false;
+      render?: (value: any, row: T) => React.ReactNode;
+    };
+
+
+
+interface Parcel {
   id: string
-  name: string
-  agentId: string
-  phoneNumber: string
-  emailAddress: string
-  dateJoined: string
-  status: "Active" | "Inactive"
-  parcelsProcessed: string
+  trackingNumber: string
+  sender: string
+  recipient: string
+  destination: string
+  status: "pending" | "in-transit" | "delivered" | "failed"
+  createdAt: string
+  weight: string
 }
 
-export function AgentsDataTable({ agents }: { agents: Agent[] }) {
+interface DataTableProps<T> {
+  data: T[];
+  columns: Column<T>[];
+  searchPlaceholder?: string;
+  showSearch?: boolean;
+  className?: string;
+  isLoading?: boolean;
+  context?: 'parcel' | 'agent' | 'dispute';
+}
+
+export const DataTable = <T extends Parcel | Agent | Dispute>({
+  data,
+  columns,
+  searchPlaceholder = 'Search...',
+  showSearch = true,
+  className = '',
+  isLoading = false,
+  context
+}: DataTableProps<T>) => {
   // State management
   const [searchTerm, setSearchTerm] = useState("")
-  const [sortColumn, setSortColumn] = useState<keyof Agent | null>(null)
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
+  const [sortConfig, setSortConfig] = useState<{
+    key: keyof T;
+    direction: 'asc' | 'desc';
+  } | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set())
@@ -33,102 +69,89 @@ export function AgentsDataTable({ agents }: { agents: Agent[] }) {
 
   // Filter and sort data
   const filteredData = useMemo(() => {
-    return agents?.filter((agent) => {
-      // Search filter
-      const matchesSearch = Object.values(agent).some((value) =>
+    return data?.filter((item) => {
+      const matchesSearch = Object.values(item).some((value) =>
         String(value).toLowerCase().includes(searchTerm.toLowerCase())
       )
-      
-      // Status filter
-      const matchesStatus = statusFilter === "all" || agent.status === statusFilter
-      
+      const matchesStatus = statusFilter === "all" || 
+        ('status' in item && item.status === statusFilter)
       return matchesSearch && matchesStatus
     })
-  }, [agents, searchTerm, statusFilter])
+  }, [data, searchTerm, statusFilter])
 
   const sortedData = useMemo(() => {
-    if (!sortColumn) return filteredData
+    if (!sortConfig?.key) return filteredData
     
     return [...filteredData].sort((a, b) => {
-      const aValue = a[sortColumn]
-      const bValue = b[sortColumn]
-      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1
-      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1
+      const aValue = a[sortConfig.key]
+      const bValue = b[sortConfig.key]
+      
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return sortConfig.direction === 'asc' 
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue)
+      }
+      
+      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1
+      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1
       return 0
     })
-  }, [filteredData, sortColumn, sortDirection])
+  }, [filteredData, sortConfig?.key, sortConfig?.direction])
 
   // Pagination
   const totalPages = Math.ceil(sortedData?.length / pageSize)
   const startIndex = (currentPage - 1) * pageSize
   const paginatedData = sortedData?.slice(startIndex, startIndex + pageSize)
 
+  // Sorting handlers
+  const handleSort = (key: keyof T) => {
+    let direction: 'asc' | 'desc' = 'asc'
+    if (sortConfig?.key === key) {
+      direction = sortConfig.direction === 'asc' ? 'desc' : 'asc'
+    }
+    setSortConfig({ key, direction })
+  }
+
+  const getSortIcon = (key: keyof T) => {
+    if (sortConfig?.key !== key) return <ArrowUpDown className="h-4 w-4" />
+    return sortConfig.direction === 'asc' 
+      ? <ArrowUp className="h-4 w-4" /> 
+      : <ArrowDown className="h-4 w-4" />
+  }
+
   // Row selection
-  const toggleRowSelection = (agentId: string) => {
-    const newSelectedRows = new Set(selectedRows)
-    newSelectedRows.has(agentId) ? newSelectedRows.delete(agentId) : newSelectedRows.add(agentId)
-    setSelectedRows(newSelectedRows)
+  const toggleRowSelection = (id: string) => {
+    const newSelected = new Set(selectedRows)
+    newSelected.has(id) ? newSelected.delete(id) : newSelected.add(id)
+    setSelectedRows(newSelected)
   }
 
   const toggleSelectAll = () => {
     setSelectedRows(prev => 
-      prev.size === paginatedData?.length ? new Set() : new Set(paginatedData?.map(agent => agent.id))
+      prev.size === paginatedData.length 
+        ? new Set() 
+        : new Set(paginatedData.map(item => item.id))
     )
   }
 
   // Export functionality
   const handleExport = () => {
     const dataToExport = selectedRows.size > 0 
-      ? agents.filter(agent => selectedRows.has(agent.id))
-      : agents
-    
-    exportToCSV(dataToExport, "agents_export.csv")
-  }
-
-  // Implement this utility function in lib/utils.ts
-  /*
-  export function exportToCSV(data: any[], filename: string) {
-    const headers = Object.keys(data[0]).join(",")
-    const rows = data.map(obj => Object.values(obj).join(","))
-    const csv = [headers, ...rows].join("\n")
-    
-    const blob = new Blob([csv], { type: "text/csv" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  }
-  */
-
-  // Sorting
-  const handleSort = (column: keyof Agent) => {
-    if (sortColumn === column) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc")
-    } else {
-      setSortColumn(column)
-      setSortDirection("asc")
-    }
-  }
-
-  const getSortIcon = (column: keyof Agent) => {
-    if (sortColumn !== column) return <ArrowUpDown className="h-4 w-4" />
-    return sortDirection === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
+      ? data.filter(item => selectedRows.has(item.id))
+      : data
+    exportToCSV(dataToExport, `${context}_export.csv`)
   }
 
   return (
-    <div className="w-full bg-white p-6 rounded-lg">
+    <div className={`w-full bg-white p-6 rounded-lg ${className}`}>
       {/* Header Section */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <h2 className="text-xl font-semibold text-gray-900">
-            Agents <span className="text-[#AEFF8C]">{filteredData?.length}</span>
+            {context} 
+            <span className="text-[#AEFF8C] ml-2">{filteredData?.length}</span>
           </h2>
           <div className="flex items-center gap-2 text-sm text-gray-600">
-            <span>Showing</span>
             <Select
               value={pageSize.toString()}
               onValueChange={(value) => {
@@ -140,28 +163,31 @@ export function AgentsDataTable({ agents }: { agents: Agent[] }) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="5">5</SelectItem>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="20">20</SelectItem>
-                <SelectItem value="50">50</SelectItem>
+                {[5, 10, 20, 50].map(size => (
+                  <SelectItem key={size} value={size.toString()}>{size}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
+            <span>per page</span>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Search agents..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value)
-                setCurrentPage(1)
-              }}
-              className="pl-10 w-64"
-            />
-          </div>
+          {showSearch && (
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder={searchPlaceholder}
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value)
+                  setCurrentPage(1)
+                }}
+                className="pl-10 w-64"
+              />
+            </div>
+          )}
+          
           <div className="relative">
             <Button 
               variant="outline" 
@@ -183,17 +209,21 @@ export function AgentsDataTable({ agents }: { agents: Agent[] }) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="Active">Active</SelectItem>
-                    <SelectItem value="Inactive">Inactive</SelectItem>
+                    {statusOptions.map(option => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
             )}
           </div>
+          
           <Button 
             className="bg-[#AEFF8C] hover:bg-[#9EEF7C] text-gray-900 flex items-center gap-2"
             onClick={handleExport}
-            disabled={agents?.length === 0}
+            disabled={data?.length === 0}
           >
             <Download className="h-4 w-4" />
             Export
@@ -204,69 +234,71 @@ export function AgentsDataTable({ agents }: { agents: Agent[] }) {
       {/* Table */}
       <div className="border border-gray-200 rounded-lg overflow-hidden">
         <Table>
-          <TableHeader className="bg-gray-50 text-[14px]">
+          <TableHeader className="bg-gray-50">
             <TableRow>
-              <TableHead className="w-10 text-[14px]">
+              <TableHead className="w-12">
                 <Checkbox
-                  checked={selectedRows?.size === paginatedData?.length && paginatedData?.length > 0}
+                  checked={selectedRows.size > 0 && selectedRows.size === paginatedData.length}
                   onCheckedChange={toggleSelectAll}
-                  className="data-[state=checked]:bg-[#AEFF8C] data-[state=checked]:text-gray-900 border-gray-300"
+                  className="data-[state=checked]:bg-[#AEFF8C] data-[state=checked]:text-gray-900"
                 />
               </TableHead>
-              {[
-                { key: "name", label: "Name" },
-                { key: "agentId", label: "Agent ID" },
-                { key: "phoneNumber", label: "Phone Number" },
-                { key: "emailAddress", label: "Email Address" },
-                { key: "dateJoined", label: "Date Joined" },
-                { key: "status", label: "Status" },
-                { key: "parcelsProcessed", label: "Parcels Processed" }
-              ].map((column) => (
-                <TableHead key={column.key} className="font-semibold text-gray-700 text-[14px]">
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleSort(column.key as keyof Agent)}
-                    className="h-auto p-0 font-semibold hover:bg-transparent"
+              {columns?.map((column) => (
+                <TableHead key={column.key as string}>
+                  <div 
+                    className={cn(
+                      "flex items-center",
+                      column.sortable && "cursor-pointer hover:text-gray-900"
+                    )}
+                    onClick={() => column.sortable && handleSort(column.key)}
                   >
                     {column.label}
-                    {getSortIcon(column.key as keyof Agent)}
-                  </Button>
+                    {column.sortable && (
+                      <span className="ml-2">
+                        {getSortIcon(column.key)}
+                      </span>
+                    )}
+                  </div>
                 </TableHead>
               ))}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginatedData?.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                  No agents found
-                </TableCell>
-              </TableRow>
-            ) : (
-              paginatedData?.map((agent) => (
-                <TableRow key={agent.id} className="hover:bg-gray-50">
+            {paginatedData?.length > 0 ? (
+              paginatedData?.map((row) => (
+                <TableRow key={row.id} className="hover:bg-gray-50">
                   <TableCell>
                     <Checkbox
-                      checked={selectedRows.has(agent.id)}
-                      onCheckedChange={() => toggleRowSelection(agent?.id)}
-                      className="data-[state=checked]:bg-[#AEFF8C] data-[state=checked]:text-gray-900 border-gray-300"
+                      checked={selectedRows.has(row.id)}
+                      onCheckedChange={() => toggleRowSelection(row.id)}
+                      className="data-[state=checked]:bg-[#AEFF8C] data-[state=checked]:text-gray-900"
                     />
                   </TableCell>
-                  <TableCell className="font-medium text-gray-900">{agent.name}</TableCell>
-                  <TableCell className="text-gray-600">{agent.agentId}</TableCell>
-                  <TableCell className="text-gray-600">{agent.phoneNumber}</TableCell>
-                  <TableCell className="text-gray-600">{agent.emailAddress}</TableCell>
-                  <TableCell className="text-gray-600">{agent.dateJoined}</TableCell>
-                  <TableCell>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      agent.status === "Active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                    }`}>
-                      {agent.status}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-gray-600">{agent.parcelsProcessed}</TableCell>
+{columns?.map((column) => (
+  <TableCell key={`${row.id}-${String(column.key)}`}>
+    {column.render
+      ? column.render(
+          typeof column.key === "string" && !(column.key in row)
+            ? undefined
+            : row[column.key as keyof T],
+          row
+        )
+      : String(
+          typeof column.key === "string" && !(column.key in row)
+            ? ""
+            : row[column.key as keyof T]
+        )}
+  </TableCell>
+))}
+
                 </TableRow>
               ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={columns.length + 1} className="h-24 text-center">
+                  No results found
+                </TableCell>
+              </TableRow>
             )}
           </TableBody>
         </Table>
@@ -282,28 +314,30 @@ export function AgentsDataTable({ agents }: { agents: Agent[] }) {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage(currentPage - 1)}
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
             >
               <ChevronLeft className="h-4 w-4" />
               Previous
             </Button>
             <div className="flex items-center gap-1">
-              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                let page = i + 1
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum = i + 1
                 if (totalPages > 5 && currentPage > 3) {
-                  page = currentPage - 2 + i
-                  if (page > totalPages) page = totalPages - 4 + i
+                  pageNum = currentPage - 2 + i
+                  if (pageNum > totalPages - 2) {
+                    pageNum = totalPages - 4 + i
+                  }
                 }
                 return (
                   <Button
-                    key={page}
-                    variant={currentPage === page ? "default" : "outline"}
+                    key={pageNum}
+                    variant={currentPage === pageNum ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setCurrentPage(page)}
-                    className={currentPage === page ? "bg-[#AEFF8C] text-gray-900 hover:bg-[#9EEF7C]" : ""}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={currentPage === pageNum ? "bg-[#AEFF8C] text-gray-900 hover:bg-[#9EEF7C]" : ""}
                   >
-                    {page}
+                    {pageNum}
                   </Button>
                 )
               })}
@@ -311,7 +345,7 @@ export function AgentsDataTable({ agents }: { agents: Agent[] }) {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage(currentPage + 1)}
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
               disabled={currentPage === totalPages}
             >
               Next

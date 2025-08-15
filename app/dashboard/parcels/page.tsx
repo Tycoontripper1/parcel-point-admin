@@ -2,13 +2,14 @@
 
 import { useState } from "react"
 import { PageHeader } from "@/components/ui/page-header"
-import { DataTable, type Column } from "@/components/ui/data-table"
+import {  DataTable, } from "@/components/ui/data-table"
 import { StatusBadge, type StatusType } from "@/components/ui/status-badge"
-import { ActionButtons } from "@/components/ui/action-buttons"
 import { Modal, ConfirmModal } from "@/components/ui/modal"
 import { TextField } from "@/components/ui/form-field"
 import { Button } from "@/components/ui/button"
+import { ActionButtons } from "@/components/ui/action-buttons"
 import { Plus } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 interface Parcel {
   id: string
@@ -19,7 +20,23 @@ interface Parcel {
   status: "pending" | "in-transit" | "delivered" | "failed"
   createdAt: string
   weight: string
+  
 }
+type Column<T> =
+  | {
+      key: keyof T;
+      label: string;
+      sortable: true;
+      render?: (value: any, row: T) => React.ReactNode;
+    }
+  | {
+      key: string;
+      label: string;
+      sortable?: false;
+      render?: (value: any, row: T) => React.ReactNode;
+    };
+
+
 
 const mockParcels: Parcel[] = [
   {
@@ -82,6 +99,7 @@ export default function ParcelsPage() {
     destination: "",
     weight: "",
   })
+  const router = useRouter()
 
   const columns: Column<Parcel>[] = [
     {
@@ -124,20 +142,20 @@ export default function ParcelsPage() {
       label: "Created",
       sortable: true,
     },
-    // {
-    //   key: "actions",
-    //   label: "Actions",
-    //   render: (_, row: Parcel) => (
-    //     <ActionButtons
-    //       onView={() => console.log("View", row.id)}
-    //       onEdit={() => console.log("Edit", row.id)}
-    //       onDelete={() => {
-    //         setSelectedParcel(row)
-    //         setShowDeleteModal(true)
-    //       }}
-    //     />
-    //   ),
-    // },
+    {
+      key: "actions",
+      label: "Actions",
+      render: (_:any, row: Parcel) => (
+        <ActionButtons
+          onView={() => router.push(`/dashboard/parcels/${row.id}`)}
+          onEdit={() => console.log("Modify", row.id)}
+          onDelete={() => {
+            setSelectedParcel(row)
+            setShowDeleteModal(true)
+          }}
+        />
+      ),
+    },
   ]
 
   const handleAddParcel = () => {
@@ -181,6 +199,7 @@ export default function ParcelsPage() {
         columns={columns}
         searchPlaceholder="Search parcels..."
         className="bg-white rounded-lg shadow"
+        context={'parcel'}
       />
 
       {/* Add Parcel Modal */}
@@ -189,6 +208,7 @@ export default function ParcelsPage() {
         onClose={() => setShowAddModal(false)}
         title="Add New Parcel"
         description="Enter the details for the new parcel"
+        showCloseButton={false}
       >
         <div className="space-y-4">
           <TextField

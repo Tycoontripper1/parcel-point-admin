@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Eye, EyeOff, Mail, Lock } from "lucide-react"
 import Link from "next/link"
 import { AuthLayout } from "@/lib/AuthLayouts"
+import Loader from "@/components/dashboard/Loader"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -37,6 +38,7 @@ export default function LoginPage() {
       title="Log In" 
       subtitle="Enter your log in credentials to continue"
     >
+      <Loader isLoading={isLoading} />
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Email Field */}
         <div className="space-y-2">
@@ -105,7 +107,7 @@ export default function LoginPage() {
           disabled={isLoading}
           className="w-full h-12 bg-[#AEFF8C] hover:bg-[#9EEF7C] text-gray-900 font-medium text-base"
         >
-          {isLoading ? "Logging in..." : "Login"}
+          {"Login"}
         </Button>
 
         {/* Forgot Password */}
